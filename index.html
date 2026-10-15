@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f5ee">
+  <title>Diagnostico de plantas | Campo Claro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="./app.js" defer></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202b21;
+      --muted: #69756b;
+      --line: #dce2d7;
+      --paper: #f3f5ee;
+      --surface: #fff;
+      --green: #2d6847;
+      --green-dark: #204c36;
+      --green-pale: #e4eee3;
+      --amber: #e3a33b;
+      font-family: "DM Sans", sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      font-synthesis: none;
+    }
+    * { box-sizing: border-box; }
+    body { min-width: 320px; min-height: 100vh; margin: 0; }
+    header {
+      height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 max(22px, calc((100vw - 1120px) / 2));
+      border-bottom: 1px solid var(--line);
+      background: #fbfcf8;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; font-size: 14px; font-weight: 700; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 9px 9px 9px 2px;
+      background: var(--green);
+      color: #fff;
+      font-size: 14px;
+    }
+    .header-note { color: var(--muted); font-size: 12px; }
+    main { width: min(100% - 40px, 1040px); margin: 0 auto; padding: 44px 0 58px; }
+    .intro { margin: 0 0 25px; }
+    .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    h1 { margin: 0; font-family: "Newsreader", Georgia, serif; font-size: 40px; font-weight: 500; line-height: 1.08; }
+    .lede { max-width: 600px; margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); gap: 16px; align-items: stretch; }
+    .panel { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 0 18px; border-bottom: 1px solid #edf0e9; }
+    .panel-title { margin: 0; font-size: 13px; font-weight: 700; }
+    .model-status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #b9c1b8; }
+    .model-status[data-state="ready"] .status-dot { background: #4d9360; }
+    .model-status[data-state="error"] .status-dot { background: #bd5146; }
+    .photo-area { min-height: 340px; display: grid; place-items: center; margin: 16px; overflow: hidden; border: 1px dashed #c8d2c5; border-radius: 6px; background: #f8faf5; }
+    .photo-area[data-dragging="true"] { border-color: var(--green); background: var(--green-pale); }
+    .photo-area img { display: block; max-width: 100%; max-height: 410px; object-fit: contain; }
+    .photo-empty { padding: 32px 18px; text-align: center; }
+    .photo-symbol { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto 14px; border-radius: 50%; background: var(--green-pale); color: var(--green-dark); font-size: 20px; }
+    .photo-empty strong { display: block; margin-bottom: 5px; font-size: 14px; }
+    .photo-empty p { margin: 0; color: var(--muted); font-size: 12px; }
+    .actions { display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; }
+    button { min-height: 42px; border: 0; border-radius: 5px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    button:focus-visible, .photo-area:focus-visible { outline: 3px solid #8bb394; outline-offset: 2px; }
+    button:disabled { cursor: not-allowed; opacity: .48; }
+    .primary { flex: 1; background: var(--green); color: #fff; }
+    .primary:not(:disabled):hover { background: var(--green-dark); }
+    .secondary { padding: 0 14px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+    .result-body { padding: 20px; }
+    .result-label { margin: 0 0 6px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .result-class { min-height: 36px; margin: 0; font-family: "Newsreader", Georgia, serif; font-size: 29px; font-weight: 500; line-height: 1.2; }
+    .confidence { margin: 6px 0 22px; color: var(--muted); font-size: 13px; }
+    .probability + .probability { margin-top: 17px; }
+    .probability-head { display: flex; justify-content: space-between; margin-bottom: 7px; font-size: 12px; }
+    .probability-head span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .track { height: 7px; overflow: hidden; border-radius: 10px; background: #e9ede6; }
+    .fill { width: 0; height: 100%; border-radius: inherit; background: var(--green); transition: width .35s ease; }
+    .fill.unhealthy { background: var(--amber); }
+    .result-message { min-height: 38px; margin: 22px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .privacy-note { margin: 13px 0 0; padding-top: 13px; border-top: 1px solid #edf0e9; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    footer { margin-top: 18px; color: #7c867d; font-size: 11px; line-height: 1.5; }
+    #file-input { display: none; }
+    @media (max-width: 720px) {
+      header { height: 58px; padding: 0 16px; }
+      .header-note { max-width: 130px; text-align: right; }
+      main { width: min(100% - 24px, 560px); padding: 30px 0 42px; }
+      h1 { font-size: 34px; }
+      .workspace { grid-template-columns: 1fr; }
+      .photo-area { min-height: 270px; }
+      .result-body { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="brand-mark" aria-hidden="true">CC</span><span>Campo Claro</span></div>
+    <span class="header-note">Clasificacion visual de hojas</span>
+  </header>
+  <main>
+    <section class="intro">
+      <p class="eyebrow">Analisis foliar</p>
+      <h1>Diagnostico de plantas</h1>
+      <p class="lede">Clasificacion binaria de hojas saludables y no saludables.</p>
+    </section>
+    <section class="workspace" aria-label="Diagnostico de hoja">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Fotografia</h2>
+          <span class="model-status" id="model-status" data-state="idle"><span class="status-dot"></span><span id="status-text">Modelo listo para cargar</span></span>
+        </div>
+        <div class="photo-area" id="drop-area" tabindex="0" role="button" aria-label="Seleccionar o arrastrar una fotografia de hoja">
+          <div class="photo-empty" id="photo-empty">
+            <span class="photo-symbol" aria-hidden="true">+</span>
+            <strong>Selecciona una imagen de hoja</strong>
+            <p>JPG, PNG o WEBP</p>
+          </div>
+          <img id="preview" alt="Vista previa de la hoja" hidden>
+        </div>
+        <input id="file-input" type="file" accept="image/png,image/jpeg,image/webp">
+        <div class="actions">
+          <button class="secondary" id="choose-button" type="button">Elegir imagen</button>
+          <button class="primary" id="analyze-button" type="button" disabled>Analizar hoja</button>
+        </div>
+      </div>
+      <div class="panel" aria-live="polite">
+        <div class="panel-head"><h2 class="panel-title">Resultado</h2></div>
+        <div class="result-body">
+          <p class="result-label">Clasificacion</p>
+          <p class="result-class" id="result-class">Sin analizar</p>
+          <p class="confidence" id="confidence">La prediccion aparecera aqui.</p>
+          <div class="probability">
+            <div class="probability-head"><span>Healthy</span><span id="healthy-value">--</span></div>
+            <div class="track"><div class="fill" id="healthy-fill"></div></div>
+          </div>
+          <div class="probability">
+            <div class="probability-head"><span>Unhealthy</span><span id="unhealthy-value">--</span></div>
+            <div class="track"><div class="fill unhealthy" id="unhealthy-fill"></div></div>
+          </div>
+          <p class="result-message" id="result-message">Carga una foto para comenzar.</p>
+          <p class="privacy-note">La imagen se procesa en tu navegador; no se envia a un servidor.</p>
+        </div>
+      </div>
+    </section>
+    <footer>Clasificacion binaria experimental. No identifica enfermedades especificas ni sustituye una evaluacion agronomica.</footer>
+  </main>
+</body>
+</html>
